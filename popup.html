@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReachAI</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 340px;
+      min-height: 200px;
+      background: #0f0f13;
+      color: #e2e2f0;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 100%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 18px 20px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-text { font-size: 16px; font-weight: 700; letter-spacing: -0.4px; }
+    .logo-tag { font-size: 10px; color: #6366f1; font-weight: 600; margin-top: -2px; }
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: #888;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .tab-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #666;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 12px 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover { color: #a5b4fc; }
+    .tab-btn.active { border-bottom-color: #6366f1; color: #a5b4fc; font-weight: 600; }
+
+    /* Sections */
+    .section { padding: 18px 20px; display: none; }
+    .section.active { display: block; }
+
+    /* Form elements */
+    .field { margin-bottom: 14px; }
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    input, textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 9px;
+      color: #e2e2f0;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus { border-color: #6366f1; }
+    input::placeholder, textarea::placeholder { color: #444; }
+    textarea { resize: none; line-height: 1.5; }
+
+    /* API Key input */
+    .key-wrap { position: relative; }
+    .key-wrap input { padding-right: 38px; font-family: monospace; letter-spacing: 0.5px; }
+    .key-eye {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #555;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    /* Save button */
+    .save-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .save-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .save-btn:active { transform: none; }
+
+    /* Status message */
+    .status-msg {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #22c55e;
+      text-align: center;
+      display: none;
+    }
+    .status-msg.error { color: #f87171; }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .stat-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .stat-value { font-size: 22px; font-weight: 700; color: #a5b4fc; }
+    .stat-label { font-size: 10px; color: #666; margin-top: 2px; }
+
+    /* Quick launch */
+    .quick-btn {
+      width: 100%;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: 10px;
+      color: #a5b4fc;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .quick-btn:hover { background: rgba(99,102,241,0.2); border-color: #6366f1; }
+
+    /* Tips */
+    .tip {
+      background: rgba(99,102,241,0.08);
+      border-left: 3px solid #6366f1;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 12px;
+      font-size: 11.5px;
+      color: #888;
+      line-height: 1.5;
+      margin-top: 14px;
+    }
+    .tip strong { color: #a5b4fc; }
+
+    /* About */
+    .about-section { padding: 18px 20px; }
+    .feature-list { list-style: none; }
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #aaa;
+      font-size: 12.5px;
+      line-height: 1.4;
+    }
+    .feature-list li:last-child { border: none; }
+    .feat-icon { font-size: 15px; flex-shrink: 0; }
+
+    .version-tag {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 11px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">ReachAI</div>
+        <div class="logo-tag">LinkedIn AI Outreach</div>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-dot"></div>
+      Active
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="home">Home</button>
+    <button class="tab-btn" data-tab="profile">My Profile</button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+    <button class="tab-btn" data-tab="about">About</button>
+  </div>
+
+  <!-- HOME TAB -->
+  <div class="section active" id="tab-home">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-generated">0</div>
+        <div class="stat-label">Messages Generated</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-copied">0</div>
+        <div class="stat-label">Messages Copied</div>
+      </div>
+    </div>
+
+    <button class="quick-btn" id="launch-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#a5b4fc"/>
+      </svg>
+      Open ReachAI Panel on LinkedIn
+    </button>
+
+    <div class="tip">
+      <strong>💡 How to use:</strong> Navigate to any LinkedIn profile, then click the <strong>ReachAI</strong> button that appears at the bottom-right of the page to open the AI panel.
+    </div>
+  </div>
+
+  <!-- MY PROFILE TAB -->
+  <div class="section" id="tab-profile">
+    <div class="field">
+      <div class="field-label">Your Full Name</div>
+      <input type="text" id="user-name" placeholder="e.g. Arjun Sharma" />
+    </div>
+    <div class="field">
+      <div class="field-label">Your Role / Title</div>
+      <input type="text" id="user-role" placeholder="e.g. Product Manager at Google" />
+    </div>
+    <div class="field">
+      <div class="field-label">Company</div>
+      <input type="text" id="user-company" placeholder="e.g. Google" />
+    </div>
+    <div class="field">
+      <div class="field-label">Industry</div>
+      <input type="text" id="user-industry" placeholder="e.g. SaaS / Fintech / AI" />
+    </div>
+    <div class="field">
+      <div class="field-label">Your Value Proposition / What you offer</div>
+      <textarea id="user-value" rows="3" placeholder="e.g. I help B2B startups scale from 0 to 1M ARR through PLG strategies…"></textarea>
+    </div>
+    <button class="save-btn" id="save-profile">Save Profile</button>
+    <div class="status-msg" id="profile-status">✓ Profile saved successfully</div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="section" id="tab-settings">
+    <div class="field">
+      <div class="field-label">Google Gemini API Key</div>
+      <div class="key-wrap">
+        <input type="password" id="api-key" placeholder="AIzaSy…" />
+        <button class="key-eye" id="toggle-key">👁</button>
+      </div>
+    </div>
+    <div class="tip" style="margin-bottom: 14px; margin-top: 0;">
+      Get your free API key at <strong>aistudio.google.com</strong>. Your key is stored locally and never shared.
+    </div>
+    <button class="save-btn" id="save-settings">Save Settings</button>
+    <div class="status-msg" id="settings-status">✓ API key saved</div>
+    <div class="status-msg error" id="settings-error"></div>
+  </div>
+
+  <!-- ABOUT TAB -->
+  <div class="about-section" id="tab-about" style="display:none">
+    <ul class="feature-list">
+      <li><span class="feat-icon">✉️</span> Personalized outreach DMs using live LinkedIn profile data</li>
+      <li><span class="feat-icon">🤝</span> Smart connection request notes (under 300 chars)</li>
+      <li><span class="feat-icon">💬</span> Thoughtful comment generation on posts</li>
+      <li><span class="feat-icon">🔁</span> Follow-up messages that don't feel pushy</li>
+      <li><span class="feat-icon">💼</span> Job referral asks crafted professionally</li>
+      <li><span class="feat-icon">🎨</span> Tone control: Professional / Friendly / Bold / Concise</li>
+      <li><span class="feat-icon">✏️</span> Editable output — tweak before sending</li>
+      <li><span class="feat-icon">🔒</span> Your API key stays on your device</li>
+    </ul>
+    <div class="version-tag">ReachAI v1.1 · Powered by Google Gemini</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
