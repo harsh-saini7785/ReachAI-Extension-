@@ -324,7 +324,7 @@
       return;
     }
     const userProfile = stored.userProfile || {};
-    const apiKey = 'AIzaSyDgGSpPOuElJTieVR74K-uw1dStOX2r91c' || stored.apiKey || '';
+    const apiKey = stored.apiKey || '';
 
     if (!apiKey) {
       showError('Please add your Google Gemini API key in Settings first.');
@@ -337,9 +337,9 @@
 
     const prompt = buildPrompt(type, tone, size, targetProfile, userProfile, customContext);
 
-    // Adjust token limits based on selected size
-    const tokenLimits = { short: 300, medium: 800, large: 1500 };
-    const maxTokens = tokenLimits[size] || 800;
+    // Give the model a high token budget because Gemini 3 Flash Preview is a 'thinking' model
+    // and its internal thoughts count towards maxOutputTokens. Length is controlled by the prompt.
+    const maxTokens = 4096;
 
     try {
       // Using Gemini 3 Flash Preview for optimal speed and reliability
@@ -355,7 +355,6 @@
             parts: [{ text: prompt }]
           }],
           generationConfig: {
-            maxOutputTokens: maxTokens,
             temperature: 0.8
           }
         })
@@ -380,16 +379,18 @@
     const targetInfo = `
 ===== TARGET PERSON'S LINKEDIN PROFILE =====
 Full Name: ${target.name || 'Unknown'}
-Headline / Title: ${target.headline || 'N/A'}
+Headline / Title (Contains current role/company): ${target.headline || 'N/A'}
 Location: ${target.location || 'N/A'}
 About / Bio: ${target.about || 'N/A'}
-Work Experience: ${target.experience?.join(' | ') || 'N/A'}
+Scraped Work Experience: ${target.experience?.join(' | ') || 'N/A'}
 Key Skills: ${target.skills?.join(', ') || 'N/A'}
 Recent LinkedIn Posts: ${target.recentPosts?.join(' | ') || 'None found'}
 Education: ${target.education?.join(', ') || 'N/A'}
 Connection Degree: ${target.connectionDegree || 'N/A'}
 Mutual Connections: ${target.mutualConnections || 'None'}
 Profile URL: ${target.profileUrl || 'N/A'}
+
+NOTE TO AI: Use the 'Headline / Title' as the primary source of truth for their CURRENT job and CURRENT company. Do not assume their current company from 'Scraped Work Experience' if it conflicts with their Headline.
 `.trim();
 
     const userInfo = `
@@ -450,21 +451,20 @@ Your message MUST:
 4. Keep it light and give them an easy out ("No worries if the timing isn't right")
 5. Feel like a natural continuation, not a desperate chase`,
 
-      referral: `Write a LinkedIn message asking for a job referral at their company.
+      referral: `Write a customized, dynamic LinkedIn DM asking for a job referral or exploring an open role at their company. Use their profile to generate a highly personalized message.
 
-Your message MUST:
-1. Be upfront about what you're asking (don't bury the ask)
-2. Mention the SPECIFIC role or team you're interested in
-3. Briefly explain why you're a strong fit (2-3 relevant highlights from your background)
-4. Make it EASY for them to help — offer to send your resume, a short blurb they can forward, etc.
-5. Be respectful of their time and not assume they owe you anything`
+Your message MUST follow this flow, but the content should be uniquely generated based on the profiles:
+1. Start with a professional greeting and a strong opening highlighting a specific synergy between you and them/their company.
+2. State clearly that you are interested in joining their company, specifying the type of role.
+3. Bridge your own skills and experience dynamically to what their company does. Use specific achievements from your profile that make you a great fit.
+4. Close with a polite ask for a brief chat or referral, and provide a standard professional sign-off (e.g., "Best regards, [My Name]").`
     }[type];
 
     const extra = customContext ? `\n\nADDITIONAL CONTEXT FROM SENDER:\n${customContext}` : '';
 
-    return `You are an elite LinkedIn copywriter and networking strategist. You write messages that get replies because they feel deeply personal, intelligent, and human.
+    return `You are an elite LinkedIn networking strategist. You write highly effective, personalized business messages.
 
-Your job: Carefully study the target person's LinkedIn profile below, understand who they are, what they care about, and what motivates them. Then write a highly personalized ${type} message.
+Your job: Study the target person's profile below, and write a complete, fully-finished ${type} message. Use your generative AI capabilities to make the message sound natural, highly personalized, and intelligent.
 
 ${targetInfo}
 
@@ -482,16 +482,14 @@ Target length: ${sizeGuide.words}
 ${sizeGuide.desc}
 
 ===== CRITICAL RULES =====
-1. NEVER start with "I hope this message finds you well", "I came across your profile", or any generic opener
-2. MUST reference at least one SPECIFIC detail from their profile (their job title, company, a skill, a post, their education, etc.)
-3. Write like a real human — vary sentence length, use natural language, avoid corporate jargon
-4. NO excessive emojis (0-2 max)
-5. DO NOT include any subject line, greeting label, or sign-off label — just the raw message text
-6. DO NOT include any preamble, explanation, or commentary — output ONLY the message
-7. If writing a connection request, STRICTLY stay under 300 characters
-8. Make the reader feel like this message was written ONLY for them
+1. Write a COMPLETE message from start to finish. Do not just write a single sentence.
+2. Analyze the target profile and weave in genuine, relevant references to their work.
+3. Write dynamically and creatively—do not use generic fill-in-the-blank templates.
+4. Vary sentence length and use natural language.
+5. NO excessive emojis (0-2 max).
+6. Always include a professional sign-off at the end with the sender's name.
 
-Now write the message:`;
+Now write the full message:`;
   }
 
   function displayMessage(text) {
@@ -805,7 +803,9 @@ Now write the message:`;
         font-size: 13px;
         line-height: 1.65;
         padding: 14px;
-        min-height: 80px;
+        min-height: 170px;
+        max-height: 1000px;
+        overflow: auto;
         outline: none;
         white-space: pre-wrap;
       }
