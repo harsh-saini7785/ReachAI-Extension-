@@ -13,77 +13,44 @@
   function scrapeTargetProfile() {
     const profile = {};
 
-    // Name
-    const nameEl = document.querySelector('h1.text-heading-xlarge, h1[class*="inline"]');
+    // 1. Name - use specific classes, fallback to the main h1 on the page
+    const nameEl = document.querySelector('h1.text-heading-xlarge, .pv-text-details__left-panel h1, h1');
     profile.name = nameEl ? nameEl.innerText.trim() : '';
 
-    // Headline
-    const headlineEl = document.querySelector('.text-body-medium.break-words, [data-generated-suggestion-target="eml_profile_name_field"]');
-    profile.headline = headlineEl ? headlineEl.innerText.trim() : '';
+    // 2. Role / Designation (Headline is best)
+    const roleEl = document.querySelector('.text-body-medium.break-words, .pv-text-details__left-panel .text-body-medium');
+    profile.role = roleEl ? roleEl.innerText.trim() : '';
 
-    // Location
-    const locationEl = document.querySelector('.text-body-small.inline.t-black--light.break-words');
-    profile.location = locationEl ? locationEl.innerText.trim() : '';
-
-    // About
-    const aboutEl = document.querySelector('#about ~ div .inline-show-more-text, [data-field="summary"] span');
-    profile.about = aboutEl ? aboutEl.innerText.trim().slice(0, 400) : '';
-
-    // Current company / experience
-    const expItems = document.querySelectorAll('#experience ~ div .pvs-list__item--line-separated, #experience + div li');
-    const experiences = [];
-    expItems.forEach((el, i) => {
-      if (i < 3) {
-        const text = el.innerText.trim().replace(/\n+/g, ' | ');
-        if (text) experiences.push(text);
+    // 3. Current Company
+    // Attempt 1: Top right company badge
+    const companyBadgeEl = document.querySelector('.pv-text-details__right-panel .inline-show-more-text, .pv-text-details__right-panel span, button[aria-label*="Current company"]');
+    let company = companyBadgeEl ? companyBadgeEl.innerText.trim() : '';
+    
+    // Attempt 2: If no company badge, parse out the first experience item in the list
+    if (!company) {
+      const expItem = document.querySelector('#experience ~ div .pvs-list__item--line-separated, .experience-item');
+      if (expItem) {
+        // Experience items contain giant blobs of text. We split by newlines, 
+        // usually the company or role is in the first two slots.
+        const parts = expItem.innerText.split('\\n').map(p => p.trim()).filter(Boolean);
+        // The company is usually nestled in the parts array if it's a standard layout
+        if (parts.length >= 2) {
+          // Typically: parts[0] is Role, parts[1] is Company (if simple)
+          // Or parts[0] is Company, parts[1] is Role (if multiple roles under one company)
+          company = parts[0] + ' | ' + parts[1]; // We give AI the raw top 2 strings of the current job to decipher
+        } else {
+          company = parts[0] || '';
+        }
       }
-    });
-    profile.experience = experiences;
-
-    // Current role title (first experience item)
-    const firstExpTitle = document.querySelector('#experience ~ div [aria-hidden="true"] span, .pvs-entity__sub-components span[aria-hidden="true"]');
-    if (firstExpTitle && !profile.headline) {
-      profile.headline = firstExpTitle.innerText.trim();
     }
 
-    // Skills
-    const skillEls = document.querySelectorAll('#skills ~ div .pvs-list__item--line-separated [aria-hidden="true"]');
-    const skills = [];
-    skillEls.forEach((el, i) => {
-      if (i < 6) skills.push(el.innerText.trim());
-    });
-    profile.skills = skills.filter(Boolean);
+    if (company && company.indexOf('\\n') !== -1) {
+      company = company.split('\\n')[0].trim();
+    }
+    profile.company = company || '';
 
-    // Recent posts
-    const postEls = document.querySelectorAll('[data-urn*="activity"] .feed-shared-text span, .feed-shared-update-v2 span[dir="ltr"]');
-    const posts = [];
-    postEls.forEach((el, i) => {
-      if (i < 2 && el.innerText.trim().length > 20) {
-        posts.push(el.innerText.trim().slice(0, 200));
-      }
-    });
-    profile.recentPosts = posts;
-
-    // Education
-    const eduEls = document.querySelectorAll('#education ~ div [aria-hidden="true"]');
-    const edu = [];
-    eduEls.forEach((el, i) => {
-      if (i < 4) edu.push(el.innerText.trim());
-    });
-    profile.education = edu.filter(Boolean);
-
-    // Connection degree
-    const degreeEl = document.querySelector('.dist-value');
-    profile.connectionDegree = degreeEl ? degreeEl.innerText.trim() : '';
-
-    // Mutual connections
-    const mutualEl = document.querySelector('.member-insights__mutual-connections span');
-    profile.mutualConnections = mutualEl ? mutualEl.innerText.trim() : '';
-
-    // Profile URL
+    // Optional but needed for UI tracking
     profile.profileUrl = window.location.href;
-
-    // Detect page type
     profile.isProfilePage = /linkedin\.com\/in\//.test(window.location.href);
 
     return profile;
@@ -340,6 +307,8 @@
     // Give the model a high token budget because Gemini 3 Flash Preview is a 'thinking' model
     // and its internal thoughts count towards maxOutputTokens. Length is controlled by the prompt.
     const maxTokens = 4096;
+    console.log(prompt, 'prompt');
+
 
     try {
       // Using Gemini 3 Flash Preview for optimal speed and reliability
@@ -377,20 +346,10 @@
 
   function buildPrompt(type, tone, size, target, user, customContext) {
     const targetInfo = `
-===== TARGET PERSON'S LINKEDIN PROFILE =====
-Full Name: ${target.name || 'Unknown'}
-Headline / Title (Contains current role/company): ${target.headline || 'N/A'}
-Location: ${target.location || 'N/A'}
-About / Bio: ${target.about || 'N/A'}
-Scraped Work Experience: ${target.experience?.join(' | ') || 'N/A'}
-Key Skills: ${target.skills?.join(', ') || 'N/A'}
-Recent LinkedIn Posts: ${target.recentPosts?.join(' | ') || 'None found'}
-Education: ${target.education?.join(', ') || 'N/A'}
-Connection Degree: ${target.connectionDegree || 'N/A'}
-Mutual Connections: ${target.mutualConnections || 'None'}
-Profile URL: ${target.profileUrl || 'N/A'}
-
-NOTE TO AI: Use the 'Headline / Title' as the primary source of truth for their CURRENT job and CURRENT company. Do not assume their current company from 'Scraped Work Experience' if it conflicts with their Headline.
+===== TARGET PERSON'S PROFILE =====
+Name: ${target.name || 'Unknown'}
+Current Role / Designation: ${target.role || 'Not provided'}
+Current Company: ${target.company || 'Not provided'}
 `.trim();
 
     const userInfo = `
@@ -451,13 +410,19 @@ Your message MUST:
 4. Keep it light and give them an easy out ("No worries if the timing isn't right")
 5. Feel like a natural continuation, not a desperate chase`,
 
-      referral: `Write a customized, dynamic LinkedIn DM asking for a job referral or exploring an open role at their company. Use their profile to generate a highly personalized message.
+      referral: `Write a customized, polite, and cool LinkedIn DM asking for a job referral.
 
-Your message MUST follow this flow, but the content should be uniquely generated based on the profiles:
-1. Start with a professional greeting and a strong opening highlighting a specific synergy between you and them/their company.
-2. State clearly that you are interested in joining their company, specifying the type of role.
-3. Bridge your own skills and experience dynamically to what their company does. Use specific achievements from your profile that make you a great fit.
-4. Close with a polite ask for a brief chat or referral, and provide a standard professional sign-off (e.g., "Best regards, [My Name]").`
+CRITICAL FOCUS: 
+- IGNORE the target's deep career history or past jobs.
+- Target's CURRENT Company: Use ONLY the company mentioned in their 'Headline'. If they list past companies (like Microsoft, etc.), IGNORE THEM.
+- Focus heavily on the SENDER'S skills and value to prove they are a great fit for the target's current company.
+
+Your message MUST follow this flow:
+1. Start with a polite, casual, and friendly greeting.
+2. Acknowledge their current role at their current company (from the Headline).
+3. Express your strong interest in joining their CURRENT company.
+4. Highlight your own relevant skills and experience (from the SENDER profile) that make you a great fit.
+5. Ask politely if they would be open to a quick chat or if they'd be willing to refer you, making it clear there is no pressure.`
     }[type];
 
     const extra = customContext ? `\n\nADDITIONAL CONTEXT FROM SENDER:\n${customContext}` : '';
@@ -768,7 +733,7 @@ Now write the full message:`;
         background: rgba(255,255,255,0.03);
         border: 1px solid rgba(99,102,241,0.2);
         border-radius: 12px;
-        overflow: hidden;
+        overflow: auto;
       }
       .rp-output-header {
         display: flex;
