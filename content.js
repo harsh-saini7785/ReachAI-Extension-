@@ -13,45 +13,33 @@
   function scrapeTargetProfile() {
     const profile = {};
 
-    // 1. Name - use specific classes, fallback to the main h1 on the page
-    const nameEl = document.querySelector('h1.text-heading-xlarge, .pv-text-details__left-panel h1, h1');
-    profile.name = nameEl ? nameEl.innerText.trim() : '';
+    // 1. Scrape the entire top Intro card (Contains Name, Headline, Location, Company Badge)
+    const introCard = document.querySelector('.ph5.pb5, .pv-top-card');
+    profile.rawIntro = introCard ? introCard.innerText.trim() : '';
 
-    // 2. Role / Designation (Headline is best)
-    const roleEl = document.querySelector('.text-body-medium.break-words, .pv-text-details__left-panel .text-body-medium');
-    profile.role = roleEl ? roleEl.innerText.trim() : '';
+    // 2. Scrape the Experience section (Contains job history, current role, current company)
+    const expCard = document.querySelector('#experience')?.closest('section');
+    profile.rawExperience = expCard ? expCard.innerText.trim().slice(0, 1500) : '';
 
-    // 3. Current Company
-    // Attempt 1: Top right company badge
-    const companyBadgeEl = document.querySelector('.pv-text-details__right-panel .inline-show-more-text, .pv-text-details__right-panel span, button[aria-label*="Current company"]');
-    let company = companyBadgeEl ? companyBadgeEl.innerText.trim() : '';
-    
-    // Attempt 2: If no company badge, parse out the first experience item in the list
-    if (!company) {
-      const expItem = document.querySelector('#experience ~ div .pvs-list__item--line-separated, .experience-item');
-      if (expItem) {
-        // Experience items contain giant blobs of text. We split by newlines, 
-        // usually the company or role is in the first two slots.
-        const parts = expItem.innerText.split('\\n').map(p => p.trim()).filter(Boolean);
-        // The company is usually nestled in the parts array if it's a standard layout
-        if (parts.length >= 2) {
-          // Typically: parts[0] is Role, parts[1] is Company (if simple)
-          // Or parts[0] is Company, parts[1] is Role (if multiple roles under one company)
-          company = parts[0] + ' | ' + parts[1]; // We give AI the raw top 2 strings of the current job to decipher
-        } else {
-          company = parts[0] || '';
-        }
-      }
+    // 3. Fallback: Grab the page title which usually contains 'Name - Role - Company'
+    profile.pageTitle = document.title;
+
+    // 4. Targeted Company Scrape: Find the specific text element within the badge (e.g. Alfa Electronics)
+    // We look for any button/badge in the intro section that contains an image (logo)
+    const badge = (introCard || document).querySelector('.pv-text-details__right-panel [role="button"], .pv-text-details__right-panel button, [role="button"][style*="min-width"], button[aria-label*="Current company"]');
+    let extractedCompany = '';
+    if (badge) {
+      // Find the deepest text-bearing element (often a p, span, or a nested div)
+      const textEl = badge.querySelector('p, span, div div div') || badge;
+      extractedCompany = textEl.innerText.trim().split('\n')[0].trim();
     }
-
-    if (company && company.indexOf('\\n') !== -1) {
-      company = company.split('\\n')[0].trim();
-    }
-    profile.company = company || '';
+    profile.explicitCompanyBadge = extractedCompany;
 
     // Optional but needed for UI tracking
     profile.profileUrl = window.location.href;
     profile.isProfilePage = /linkedin\.com\/in\//.test(window.location.href);
+
+    console.log("profile", profile);
 
     return profile;
   }
@@ -113,11 +101,11 @@
       </div>
 
       <div class="rp-tabs">
-        <button class="rp-tab active" data-type="outreach">Outreach</button>
+        <button class="rp-tab active" data-type="referral">Referral</button>
+        <button class="rp-tab" data-type="outreach">Outreach</button>
         <button class="rp-tab" data-type="connection">Connect</button>
         <button class="rp-tab" data-type="comment">Comment</button>
         <button class="rp-tab" data-type="followup">Follow-up</button>
-        <button class="rp-tab" data-type="referral">Referral</button>
       </div>
 
       <div class="rp-controls">
@@ -183,11 +171,22 @@
     const avatarEl = panel.querySelector('#rp-avatar-initials');
     const statusEl = panel.querySelector('#rp-scrape-status');
 
-    if (profile.name) {
-      nameEl.textContent = profile.name;
-      roleEl.textContent = profile.headline || '';
-      const initials = profile.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-      avatarEl.textContent = initials;
+    let uiName = 'No profile detected';
+    let uiRole = 'Navigate to a LinkedIn profile';
+
+    if (profile.pageTitle && profile.pageTitle.includes('|')) {
+      uiName = profile.pageTitle.split('|')[0].trim();
+      uiRole = profile.pageTitle.split('|')[1]?.trim() || '';
+    } else if (profile.pageTitle && profile.pageTitle.includes('-')) {
+      uiName = profile.pageTitle.split('-')[0].trim();
+      uiRole = 'LinkedIn Member';
+    }
+
+    if (profile.rawIntro || profile.pageTitle) {
+      nameEl.textContent = uiName;
+      roleEl.textContent = uiRole;
+      const initials = uiName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+      avatarEl.textContent = initials || '?';
       statusEl.innerHTML = `<div class="rp-dot green"></div>`;
     } else {
       nameEl.textContent = 'No profile detected';
@@ -213,7 +212,7 @@
     });
 
     // Tabs
-    let activeType = 'outreach';
+    let activeType = 'referral';
     panel.querySelectorAll('.rp-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         panel.querySelectorAll('.rp-tab').forEach(t => t.classList.remove('active'));
@@ -346,10 +345,17 @@
 
   function buildPrompt(type, tone, size, target, user, customContext) {
     const targetInfo = `
-===== TARGET PERSON'S PROFILE =====
-Name: ${target.name || 'Unknown'}
-Current Role / Designation: ${target.role || 'Not provided'}
-Current Company: ${target.company || 'Not provided'}
+===== TARGET PERSON'S RAW SCRAPED DATA =====
+Page Title: ${target.pageTitle || 'N/A'}
+Explicit Company Badge (Top Header Card): ${target.explicitCompanyBadge || 'N/A'}
+
+[RAW INTRO TEXT]
+${target.rawIntro || 'N/A'}
+
+[RAW EXPERIENCE TEXT]
+${target.rawExperience || 'N/A'}
+
+NOTE TO AI: Use 'Explicit Company Badge' as the absolute source of truth for where they work right now. If it's missing, use the Intro text. Ignore old jobs in the Experience section.
 `.trim();
 
     const userInfo = `
@@ -374,56 +380,7 @@ Value Proposition: ${user.valueProposition || 'Not provided'}
       large: { words: '200-350 words', desc: 'A detailed, in-depth message. 7-12 sentences. Include multiple references to their profile, build a narrative about why you\'re reaching out, establish credibility, and end with a compelling CTA. Use paragraph breaks for readability.' }
     }[size];
 
-    const typeInstructions = {
-      outreach: `Write a personalized LinkedIn DM for cold outreach.
-
-Your message MUST:
-1. Open with a hook that references something SPECIFIC from their profile (a recent post topic, a career move, a skill, their company's recent news)
-2. Briefly introduce yourself and what you do
-3. Clearly state WHY you're reaching out to THEM specifically (not just anyone)
-4. Connect your value to their world — what's in it for them?
-5. End with a low-pressure, easy-to-answer CTA (a question, not a demand)`,
-
-      connection: `Write a LinkedIn connection request note. MUST be under 300 characters total.
-
-Your note MUST:
-1. Mention ONE specific detail from their profile that caught your eye
-2. Explain in one line why connecting makes sense for both of you
-3. Feel genuine and human — NOT like a template
-4. NEVER use "I'd like to add you to my network" or similar generic lines`,
-
-      comment: `Write a thoughtful LinkedIn comment on their recent post or activity.
-
-Your comment MUST:
-1. Show you actually READ and understood their post/content
-2. Add genuine value — share an insight, a different perspective, or a relevant experience
-3. Be specific, not generic praise like "Great post!"
-4. Feel like something a thoughtful industry peer would write
-5. Optionally ask a smart follow-up question to spark conversation`,
-
-      followup: `Write a LinkedIn follow-up message for someone who hasn't replied.
-
-Your message MUST:
-1. NOT guilt-trip them or say "just following up" or "bumping this"
-2. Bring a NEW angle, insight, or piece of value they'd find interesting
-3. Reference something recent (their post, company news, industry trend)
-4. Keep it light and give them an easy out ("No worries if the timing isn't right")
-5. Feel like a natural continuation, not a desperate chase`,
-
-      referral: `Write a customized, polite, and cool LinkedIn DM asking for a job referral.
-
-CRITICAL FOCUS: 
-- IGNORE the target's deep career history or past jobs.
-- Target's CURRENT Company: Use ONLY the company mentioned in their 'Headline'. If they list past companies (like Microsoft, etc.), IGNORE THEM.
-- Focus heavily on the SENDER'S skills and value to prove they are a great fit for the target's current company.
-
-Your message MUST follow this flow:
-1. Start with a polite, casual, and friendly greeting.
-2. Acknowledge their current role at their current company (from the Headline).
-3. Express your strong interest in joining their CURRENT company.
-4. Highlight your own relevant skills and experience (from the SENDER profile) that make you a great fit.
-5. Ask politely if they would be open to a quick chat or if they'd be willing to refer you, making it clear there is no pressure.`
-    }[type];
+    const typeInstruction = ReachAITemplates[type];
 
     const extra = customContext ? `\n\nADDITIONAL CONTEXT FROM SENDER:\n${customContext}` : '';
 
@@ -736,12 +693,15 @@ Now write the full message:`;
         overflow: auto;
       }
       .rp-output-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 10px 14px;
         border-bottom: 1px solid rgba(255,255,255,0.06);
-        background: rgba(99,102,241,0.08);
+        background: #15151a; /* Solid background to prevent text overlap */
       }
       .rp-output-header span {
         color: #a5b4fc;
@@ -805,7 +765,7 @@ Now write the full message:`;
       setTimeout(() => {
         if (panel && panel.classList.contains('rp-open')) refreshProfileBadge();
         updateFabVisibility();
-      }, 1500);
+      }, 2500); // 2.5 second delay for stable loading
     }
   }
 
