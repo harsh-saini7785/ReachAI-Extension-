@@ -35,6 +35,23 @@
     }
     profile.explicitCompanyBadge = extractedCompany;
 
+    // 5. Intelligent Role Search: Match the badge company to the role in Experience
+    let explicitRole = '';
+    if (extractedCompany) {
+      const expItems = document.querySelectorAll('.pvs-list__item--line-separated, .experience-item, .pv-position-entity');
+      for (const item of expItems) {
+        if (item.innerText.toLowerCase().includes(extractedCompany.toLowerCase())) {
+          // The first <p> or <span> in these lists is almost always the Job Title
+          const roleEl = item.querySelector('p, span, [class*="title"]');
+          if (roleEl) {
+            explicitRole = roleEl.innerText.trim().split('\n')[0];
+            break;
+          }
+        }
+      }
+    }
+    profile.explicitRole = explicitRole;
+
     // Optional but needed for UI tracking
     profile.profileUrl = window.location.href;
     profile.isProfilePage = /linkedin\.com\/in\//.test(window.location.href);
@@ -281,63 +298,40 @@
     const targetProfile = scrapeTargetProfile();
     const customContext = panel.querySelector('#rp-custom-context').value.trim();
 
-    // Get saved user profile and API key
+    // Get saved user profile
     let stored;
     try {
-      stored = await chrome.storage.sync.get(['userProfile', 'apiKey']);
+      stored = await chrome.storage.sync.get(['userProfile']);
     } catch (e) {
       showError('Extension was updated. Please refresh this LinkedIn page (Ctrl+R / Cmd+R) and try again.');
       return;
     }
     const userProfile = stored.userProfile || {};
-    const apiKey = stored.apiKey || '';
-
-    if (!apiKey) {
-      showError('Please add your Google Gemini API key in Settings first.');
-      return;
-    }
 
     showLoading(true);
     hideError();
     panel.querySelector('#rp-output-area').style.display = 'none';
 
     const prompt = buildPrompt(type, tone, size, targetProfile, userProfile, customContext);
-
-    // Give the model a high token budget because Gemini 3 Flash Preview is a 'thinking' model
-    // and its internal thoughts count towards maxOutputTokens. Length is controlled by the prompt.
-    const maxTokens = 4096;
     console.log(prompt, 'prompt');
 
-
     try {
-      // Using Gemini 3 Flash Preview for optimal speed and reliability
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-
-      const response = await fetch(url, {
+      // Route through backend — MiniMax API key stays server-side
+      const response = await fetch('http://localhost:3001/api/generate-message', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.8
-          }
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
       });
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error?.message || `API Error ${response.status}`);
+        throw new Error(err.error || `Backend error ${response.status}`);
       }
 
       const data = await response.json();
-      const message = data.candidates[0].content.parts[0].text.trim();
-      displayMessage(message);
+      displayMessage(data.message);
     } catch (err) {
-      showError(err.message || 'Something went wrong. Check your Gemini API key.');
+      showError(err.message || 'Something went wrong. Make sure the ReachAI backend is running.');
     } finally {
       showLoading(false);
     }
@@ -345,17 +339,16 @@
 
   function buildPrompt(type, tone, size, target, user, customContext) {
     const targetInfo = `
-===== TARGET PERSON'S RAW SCRAPED DATA =====
-Page Title: ${target.pageTitle || 'N/A'}
-Explicit Company Badge (Top Header Card): ${target.explicitCompanyBadge || 'N/A'}
+===== TARGET PERSON'S PROFILE =====
+Name: ${target.pageTitle || 'Unknown'}
+Verified Current Role: ${target.explicitRole || 'N/A'}
+Verified Current Company: ${target.explicitCompanyBadge || 'N/A'}
 
-[RAW INTRO TEXT]
+[RAW DATA FOR CONTEXT]
 ${target.rawIntro || 'N/A'}
-
-[RAW EXPERIENCE TEXT]
 ${target.rawExperience || 'N/A'}
 
-NOTE TO AI: Use 'Explicit Company Badge' as the absolute source of truth for where they work right now. If it's missing, use the Intro text. Ignore old jobs in the Experience section.
+NOTE TO AI: Use 'Verified Current Role' and 'Verified Current Company' as the absolute source of truth for where they work right now. Matches these into your templates.
 `.trim();
 
     const userInfo = `
@@ -765,7 +758,7 @@ Now write the full message:`;
       setTimeout(() => {
         if (panel && panel.classList.contains('rp-open')) refreshProfileBadge();
         updateFabVisibility();
-      }, 2500); // 2.5 second delay for stable loading
+      }, 4000); // 2.5 second delay for stable loading
     }
   }
 
