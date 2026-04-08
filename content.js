@@ -387,7 +387,7 @@ ${userInfo}
 ${extra}
 
 ===== TASK =====
-${typeInstructions}
+${typeInstruction}
 
 ===== TONE =====
 ${toneGuide}

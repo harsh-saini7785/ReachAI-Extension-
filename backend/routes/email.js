@@ -89,7 +89,7 @@ ${recipientCompany ? `- Reference ${recipientCompany} naturally` : '- Be persona
         'Authorization': `Bearer ${MINIMAX_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'MiniMax-Text-01',
+        model: 'MiniMax-M2.7',
         messages: [
           {
             role: 'system',
