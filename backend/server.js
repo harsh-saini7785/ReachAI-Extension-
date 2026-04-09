@@ -12,8 +12,8 @@ const PORT = process.env.PORT || 3001;
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type'],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
 }));
 app.use(express.json());
 
@@ -26,6 +26,16 @@ app.use('/api', messageRoutes);
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'ReachAI Backend is running 🚀' });
+});
+
+// ─── Error Handler ────────────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error('💥 Global Error:', err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: err.message || 'Internal Server Error',
+    code: err.code || 'UNKNOWN_ERROR'
+  });
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────

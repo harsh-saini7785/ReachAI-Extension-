@@ -135,13 +135,24 @@
         </div>
 
         <div class="rp-label" style="margin-top:10px">Message Length</div>
-        <div class="rp-size-btns">
+        <div class="rp-size-btns" style="margin-bottom:10px;">
+          <button class="rp-size" data-size="very_short">🔹 Very Short</button>
           <button class="rp-size" data-size="short">🔹 Short</button>
           <button class="rp-size active" data-size="medium">🔸 Medium</button>
           <button class="rp-size" data-size="large">🔶 Large</button>
         </div>
 
-        <div class="rp-label" style="margin-top:10px">Custom context <span class="rp-optional">(optional)</span></div>
+        <div id="rp-referral-fields" style="display:block;">
+          <div class="rp-label" style="margin-top:10px">Job ID <span class="rp-optional">(optional)</span></div>
+          <input type="text" class="rp-context" id="rp-job-id" placeholder="e.g. REQ-12345" style="margin-bottom:10px;" />
+
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <input type="checkbox" id="rp-attach-resume" checked style="cursor:pointer;" />
+            <label for="rp-attach-resume" class="rp-label" style="margin:0; cursor:pointer; text-transform:none; letter-spacing:0; font-weight:500;">Mention attached resume</label>
+          </div>
+        </div>
+
+        <div class="rp-label">Custom context <span class="rp-optional">(optional)</span></div>
         <textarea class="rp-context" id="rp-custom-context" placeholder="e.g. Mention we both went to IIT, or I'm interested in their recent post about AI…" rows="2"></textarea>
       </div>
 
@@ -235,6 +246,11 @@
         panel.querySelectorAll('.rp-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         activeType = tab.dataset.type;
+
+        const refFields = panel.querySelector('#rp-referral-fields');
+        if (refFields) {
+          refFields.style.display = (activeType === 'referral') ? 'block' : 'none';
+        }
       });
     });
 
@@ -297,6 +313,8 @@
   async function generateMessage(type, tone, size) {
     const targetProfile = scrapeTargetProfile();
     const customContext = panel.querySelector('#rp-custom-context').value.trim();
+    const jobId = panel.querySelector('#rp-job-id') ? panel.querySelector('#rp-job-id').value.trim() : '';
+    const attachResume = panel.querySelector('#rp-attach-resume') ? panel.querySelector('#rp-attach-resume').checked : false;
 
     // Get saved user profile
     let stored;
@@ -312,7 +330,7 @@
     hideError();
     panel.querySelector('#rp-output-area').style.display = 'none';
 
-    const prompt = buildPrompt(type, tone, size, targetProfile, userProfile, customContext);
+    const prompt = buildPrompt(type, tone, size, targetProfile, userProfile, customContext, jobId, attachResume);
     console.log(prompt, 'prompt');
 
     try {
@@ -337,7 +355,7 @@
     }
   }
 
-  function buildPrompt(type, tone, size, target, user, customContext) {
+  function buildPrompt(type, tone, size, target, user, customContext, jobId, attachResume) {
     const targetInfo = `
 ===== TARGET PERSON'S PROFILE =====
 Name: ${target.pageTitle || 'Unknown'}
@@ -358,6 +376,7 @@ Role: ${user.role || 'Not provided'}
 Company: ${user.company || 'Not provided'}
 Industry: ${user.industry || 'Not provided'}
 Value Proposition: ${user.valueProposition || 'Not provided'}
+Resume Link: ${user.resumeLink || 'Not provided'}
 `.trim();
 
     const toneGuide = {
@@ -368,6 +387,7 @@ Value Proposition: ${user.valueProposition || 'Not provided'}
     }[tone];
 
     const sizeGuide = {
+      very_short: { words: 'Under 50 words (max ~300 characters)', desc: 'EXTREMELY short and punchy. 1-2 sentences max. Get straight to the point without fluff. Suitable for a LinkedIn connection note limit.' },
       short: { words: '40-80 words', desc: 'Keep it very brief and impactful. 2-3 sentences max. Every word must earn its place.' },
       medium: { words: '100-180 words', desc: 'A well-crafted message with enough detail to be compelling. 4-6 sentences. Include a specific compliment, your reason for reaching out, and a clear CTA.' },
       large: { words: '200-350 words', desc: 'A detailed, in-depth message. 7-12 sentences. Include multiple references to their profile, build a narrative about why you\'re reaching out, establish credibility, and end with a compelling CTA. Use paragraph breaks for readability.' }
@@ -375,7 +395,14 @@ Value Proposition: ${user.valueProposition || 'Not provided'}
 
     const typeInstruction = ReachAITemplates[type];
 
-    const extra = customContext ? `\n\nADDITIONAL CONTEXT FROM SENDER:\n${customContext}` : '';
+    let extra = customContext ? `\n\nADDITIONAL CONTEXT FROM SENDER:\n${customContext}` : '';
+    if (type === 'referral') {
+      if (jobId) extra += `\nInclude the Job ID ${jobId} directly in the message.`;
+      if (attachResume) extra += `\nAdd a brief note mentioning that my resume is attached or below.`;
+      if (user.resumeLink) extra += `\nIMPORTANT: Include the sender's resume link (${user.resumeLink}) naturally in the message.`;
+    } else if (user.resumeLink && (type === 'outreach' || type === 'followup')) {
+      extra += `\nYou may optionally include the sender's resume link (${user.resumeLink}) if it fits the context.`;
+    }
 
     return `You are an elite LinkedIn networking strategist. You write highly effective, personalized business messages.
 
@@ -679,11 +706,12 @@ Now write the full message:`;
       }
 
       .rp-output-area {
-        margin: 14px 20px 0;
+        margin: 14px 20px 20px;
         background: rgba(255,255,255,0.03);
         border: 1px solid rgba(99,102,241,0.2);
         border-radius: 12px;
-        overflow: auto;
+        display: flex;
+        flex-direction: column;
       }
       .rp-output-header {
         position: sticky;
@@ -695,6 +723,7 @@ Now write the full message:`;
         padding: 10px 14px;
         border-bottom: 1px solid rgba(255,255,255,0.06);
         background: #15151a; /* Solid background to prevent text overlap */
+        border-radius: 12px 12px 0 0;
       }
       .rp-output-header span {
         color: #a5b4fc;
@@ -721,11 +750,10 @@ Now write the full message:`;
         font-size: 13px;
         line-height: 1.65;
         padding: 14px;
-        min-height: 170px;
-        max-height: 1000px;
-        overflow: auto;
+        min-height: 250px;
         outline: none;
         white-space: pre-wrap;
+        word-break: break-word;
       }
       .rp-message-box:focus { background: rgba(255,255,255,0.02); }
       .rp-char-count {

@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits:    { fileSize: 5 * 1024 * 1024 }, // 5 MB max
+  limits:    { fileSize: 10 * 1024 * 1024 }, // 10 MB max
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new Error('Only PDF files are allowed.'));
@@ -27,20 +27,33 @@ const upload = multer({
 // ─── POST /api/resume ─────────────────────────────────────────────────────────
 // Receives PDF, saves it, extracts text with pdf-parse, returns summary
 router.post('/resume', upload.single('resume'), async (req, res) => {
+  console.log('📤 Upload request received');
+  
   if (!req.file) {
+    console.error('❌ No file in request');
     return res.status(400).json({ error: 'No file uploaded.' });
   }
 
   try {
+    if (!fs.existsSync(req.file.path)) {
+      throw new Error(`Uploaded file not found at ${req.file.path}`);
+    }
+    console.log(`📂 Processing file: ${req.file.originalname} (${req.file.size} bytes)`);
     const dataBuffer  = fs.readFileSync(req.file.path);
+    
+    console.log('📄 Parsing PDF...');
     const parsed      = await pdfParse(dataBuffer);
     const extractedText = parsed.text?.trim() || '';
+
+    if (!extractedText) {
+      console.warn('⚠️ PDF parsed but no text extracted');
+    }
 
     // Save extracted text alongside the PDF for quick reads
     const textPath = path.join(UPLOAD_DIR, 'resume_text.txt');
     fs.writeFileSync(textPath, extractedText, 'utf8');
 
-    console.log(`📄 Resume uploaded (${req.file.size} bytes, ${parsed.numpages} pages)`);
+    console.log(`✅ Resume processed successfully (${parsed.numpages} pages)`);
     return res.json({
       success: true,
       filename: req.file.originalname,
@@ -48,8 +61,12 @@ router.post('/resume', upload.single('resume'), async (req, res) => {
       preview:  extractedText.slice(0, 300), // first 300 chars as preview
     });
   } catch (err) {
-    console.error('PDF parse error:', err);
-    return res.status(500).json({ error: 'Failed to parse PDF', detail: err.message });
+    console.error('❌ PDF parse error:', err);
+    return res.status(500).json({ 
+      error: 'Failed to parse PDF', 
+      detail: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 

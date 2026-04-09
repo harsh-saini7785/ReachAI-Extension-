@@ -37,22 +37,17 @@ Your message MUST:
 4. Keep it light and give them an easy out ("No worries if the timing isn't right")
 5. Feel like a natural continuation, not a desperate chase`,
 
-  referral: `You MUST use one of the following templates exactly. Replace [Name] with the Target Person's Name, and logically replace [My Skills] and [My Experience] using the Sender's 'Value Proposition':
+  referral: `Write a customized LinkedIn DM asking for a job referral.
+ 
+Your message MUST follow this flow:
+1. Start with a professional greeting and a strong opening highlighting a specific synergy between you and them/their company.
+2. State clearly that you are interested in joining their company, specifying the type of role.
+3. Bridge your own skills and experience dynamically to what their company does. Use specific achievements from your profile that make you a great fit.
+4. Close with a polite ask for a brief chat or referral, and provide a standard professional sign-off.
 
-Template 1: "Hi [Name], I came across your profile and wanted to reach out. I’m currently exploring frontend opportunities and would really appreciate your support. I have [My Experience] with [My Skills]. If possible, could you please refer me for a suitable role? Happy to share my resume. Thanks!"
-
-Template 2: "Hi [Name], I’ve been following your work and really admire your experience. I’m currently looking for new opportunities and have [My Experience] building scalable UI applications using [My Skills]. I’d really appreciate it if you could consider referring me. Thanks for your time!"
-
-Template 3: "Hi [Name], hope you’re doing well! Since we’re connected here, I wanted to reach out. I’m currently exploring new roles and believe my experience with [My Skills] aligns well with strong engineering teams. Would you be open to referring me? I’d truly appreciate your support."
-
-Template 4: "Hi [Name], I’m currently looking for opportunities and wanted to reach out. I have [My Experience] building scalable applications using [My Skills], and recently worked on improving performance and creating reusable component systems. If you feel my profile is a good fit, I’d be grateful if you could refer me. Thanks!"
-
-Template 5: "Hey [Name], hope you’re doing great! I wanted to quickly reach out as I’m exploring new opportunities. I’ve been working with [My Skills] for [My Experience] and would really appreciate it if you could help me with a referral. Let me know if you need any details. Thanks!"
-
-CRITICAL FOCUS: 
-- Choose one template that best fits the Tone.
-- Replace [Name] with the target's extracted Name.
-- Replace [My Skills] and [My Experience] intelligently using the Sender's 'Value Proposition'. If their exact years of experience aren't provided, use a generic natural phrase like 'extensive experience' or 'a strong background'.
-- Do NOT hallucinate or add any company names to the template.
-- Output ONLY the filled template, with no extra text.`
+CRITICAL RULES:
+- Include the sender's Resume Link if provided in the context.
+- If a Job ID is provided, mention it clearly.
+- Do NOT use generic fill-in-the-blank templates; write a coherent, natural message.
+- Output ONLY the final message.`
 };

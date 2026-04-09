@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (profile.company)          document.getElementById('user-company').value = profile.company;
   if (profile.industry)         document.getElementById('user-industry').value = profile.industry;
   if (profile.valueProposition) document.getElementById('user-value').value = profile.valueProposition;
+  if (profile.resumeLink)       document.getElementById('user-resume-link').value = profile.resumeLink;
 
   document.getElementById('stat-generated').textContent = stats.generated;
   document.getElementById('stat-copied').textContent = stats.copied;
@@ -59,6 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       company:          document.getElementById('user-company').value.trim(),
       industry:         document.getElementById('user-industry').value.trim(),
       valueProposition: document.getElementById('user-value').value.trim(),
+      resumeLink:       document.getElementById('user-resume-link').value.trim(),
     };
     await chrome.storage.sync.set({ userProfile });
     const msg = document.getElementById('profile-status');
@@ -110,10 +112,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       resumeText.textContent = `✓ ${file.name} (${data.pages} page${data.pages > 1 ? 's' : ''}) — click to replace`;
       showResumePreview(data.preview);
     } catch (err) {
+      console.error('Upload error:', err);
       resumeText.textContent     = 'Click to upload PDF resume';
       resumeStatus.style.display = 'block';
       resumeStatus.className     = 'resume-status error';
-      resumeStatus.textContent   = `❌ ${err.message}`;
+      
+      let errorMsg = err.message;
+      if (err.message === 'Failed to fetch') {
+        errorMsg = 'Could not connect to backend. Please ensure "npm run dev" is running in the backend folder.';
+      }
+      resumeStatus.textContent   = `❌ ${errorMsg}`;
     }
     resumeInput.value = '';
   });
